@@ -57,6 +57,7 @@ import com.revenuecat.purchases.logOutWith
 import com.revenuecat.purchases.models.BillingFeature
 import com.revenuecat.purchases.models.GoogleReplacementMode
 import com.revenuecat.purchases.models.InAppMessageType
+import com.revenuecat.purchases.models.OneTimePurchaseOfferDetails
 import com.revenuecat.purchases.models.StoreProduct
 import com.revenuecat.purchases.models.StoreReplacementMode
 import com.revenuecat.purchases.models.StoreTransaction
@@ -198,6 +199,15 @@ fun purchase(
             addOnSubscriptionOptions = purchaseParams.addOnSubscriptionOptions,
             addOnPackages = purchaseParams.addOnPackages,
         )
+
+        is PurchasableItem.OneTimePurchaseOfferDetails -> purchaseOneTimePurchaseOfferDetails(
+            activity = activity,
+            productIdentifier = purchasableItem.productIdentifier,
+            optionIdentifier = purchasableItem.optionIdentifier,
+            googleIsPersonalizedPrice = purchaseParams.googleIsPersonalizedPrice,
+            presentedOfferingContext = purchaseParams.presentedOfferingContext,
+            onResult = onResult,
+        )
     }
 }
 
@@ -213,6 +223,11 @@ private sealed interface PurchasableItem {
     ) : PurchasableItem
 
     data class SubscriptionOption(
+        val productIdentifier: String,
+        val optionIdentifier: String,
+    ) : PurchasableItem
+
+    data class OneTimePurchaseOfferDetails(
         val productIdentifier: String,
         val optionIdentifier: String,
     ) : PurchasableItem
@@ -236,6 +251,7 @@ private fun validatePurchaseParams(
     val packageIdentifier = options["packageIdentifier"] as? String
     val productIdentifier = options["productIdentifier"] as? String
     val subscriptionOptionIdentifier = options["optionIdentifier"] as? String
+    val oneTimePurchaseOfferIdentifier = options["googleOneTimePurchaseOfferIdentifier"] as? String
 
     val googleOldProductId = options["googleOldProductId"] as? String
     val googleReplacementMode = options["googleReplacementMode"] as? Int
@@ -262,6 +278,9 @@ private fun validatePurchaseParams(
         }
         subscriptionOptionIdentifier != null && productIdentifier != null -> {
             PurchasableItem.SubscriptionOption(productIdentifier, subscriptionOptionIdentifier)
+        }
+        oneTimePurchaseOfferIdentifier != null && productIdentifier != null -> {
+            PurchasableItem.OneTimePurchaseOfferDetails(productIdentifier, oneTimePurchaseOfferIdentifier)
         }
         productIdentifier != null && type != null -> {
             val googleBasePlanId = options["googleBasePlanId"] as? String
@@ -778,6 +797,79 @@ fun purchaseSubscriptionOption(
         Purchases.sharedInstance.getProductsWith(
             productIdsToFetch,
             ProductType.SUBS,
+            { onResult.onError(it.map()) },
+            onReceiveStoreProducts,
+        )
+    } else {
+        onResult.onError(
+            PurchasesError(
+                PurchasesErrorCode.PurchaseInvalidError,
+                "There is no current Activity",
+            ).map(),
+        )
+    }
+}
+
+@JvmOverloads
+@OptIn(ExperimentalPreviewRevenueCatPurchasesAPI::class)
+@Suppress("LongParameterList", "LongMethod", "NestedBlockDepth", "CyclomaticComplexMethod")
+fun purchaseOneTimePurchaseOfferDetails(
+    activity: Activity?,
+    productIdentifier: String,
+    optionIdentifier: String?,
+    googleIsPersonalizedPrice: Boolean?,
+    presentedOfferingContext: Map<String, Any?>?,
+    onResult: OnResult,
+    ) {
+    if (Purchases.sharedInstance.store != Store.PLAY_STORE) {
+        onResult.onError(
+            PurchasesError(
+                PurchasesErrorCode.UnknownError,
+                "purchaseOneTimePurchaseOfferDetails() is only supported on the Play Store.",
+            ).map(),
+        )
+        return
+    }
+
+    if (activity != null) {
+        val onReceiveStoreProducts: (List<StoreProduct>) -> Unit = { storeProducts ->
+            val optionToPurchase = oneTimePurchaseOfferForIdentifiers(
+                productIdentifier = productIdentifier,
+                optionIdentifier = optionIdentifier,
+                storeProducts = storeProducts,
+            )
+
+            if (optionToPurchase != null) {
+                val purchaseParams = PurchaseParams.Builder(activity, optionToPurchase)
+
+                // Offering context
+                presentedOfferingContext?.toPresentedOfferingContext()?.let {
+                    purchaseParams.presentedOfferingContext(it)
+                }
+
+                // Personalized price
+                googleIsPersonalizedPrice?.let {
+                    purchaseParams.isPersonalizedPrice(googleIsPersonalizedPrice)
+                }
+
+                Purchases.sharedInstance.purchaseWith(
+                    purchaseParams.build(),
+                    onError = getPurchaseErrorFunction(onResult),
+                    onSuccess = getPurchaseCompletedFunction(onResult),
+                )
+            } else {
+                onResult.onError(
+                    PurchasesError(
+                        PurchasesErrorCode.ProductNotAvailableForPurchaseError,
+                        "Couldn't find one time purchase offer $optionIdentifier for product $productIdentifier",
+                    ).map(),
+                )
+            }
+        }
+
+        Purchases.sharedInstance.getProductsWith(
+            listOf(productIdentifier),
+            ProductType.INAPP,
             { onResult.onError(it.map()) },
             onReceiveStoreProducts,
         )
@@ -1382,6 +1474,21 @@ private fun subscriptionOptionForIdentifiers(
         storeProduct.subscriptionOptions?.firstOrNull { subscriptionOption ->
             storeProduct.purchasingData.productId == productIdentifier &&
                 subscriptionOption.id == optionIdentifier
+        }
+    }
+}
+
+private fun oneTimePurchaseOfferForIdentifiers(
+    productIdentifier: String,
+    optionIdentifier: String?,
+    storeProducts: List<StoreProduct>,
+): OneTimePurchaseOfferDetails? {
+    // Iterates over StoreProducts and OneTimePurchaseOfferDetailsList to find
+    // the first matching product id and one time purchase offer id
+    return storeProducts.firstNotNullOfOrNull { storeProduct ->
+        storeProduct.oneTimePurchaseOfferDetailsList?.firstOrNull { oneTimePurchaseOffer ->
+            storeProduct.purchasingData.productId == productIdentifier &&
+                oneTimePurchaseOffer.offerId == optionIdentifier
         }
     }
 }

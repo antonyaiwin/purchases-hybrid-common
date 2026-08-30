@@ -4,6 +4,7 @@ import androidx.annotation.VisibleForTesting
 import com.revenuecat.purchases.ProductType
 import com.revenuecat.purchases.amazon.AmazonStoreProduct
 import com.revenuecat.purchases.models.InstallmentsInfo
+import com.revenuecat.purchases.models.OneTimePurchaseOfferDetails
 import com.revenuecat.purchases.models.Period
 import com.revenuecat.purchases.models.Price
 import com.revenuecat.purchases.models.PricingPhase
@@ -59,6 +60,8 @@ fun StoreProduct.map(): Map<String, Any?> =
         "subscriptionPeriod" to period?.iso8601,
         "defaultOption" to defaultOption?.mapSubscriptionOption(this),
         "subscriptionOptions" to subscriptionOptions?.map { it.mapSubscriptionOption(this) },
+        "defaultOneTimeOffer" to defaultOneTimeOffer?.mapOneTimePurchaseOfferDetails(),
+        "oneTimePurchaseOfferDetailsList" to oneTimePurchaseOfferDetailsList?.map { it.mapOneTimePurchaseOfferDetails() },
         "presentedOfferingIdentifier" to presentedOfferingContext?.offeringIdentifier,
         "presentedOfferingContext" to presentedOfferingContext?.map(),
     )
@@ -260,5 +263,17 @@ private fun InstallmentsInfo.map(): Map<String, Any?> {
     return mapOf(
         "commitmentPaymentsCount" to commitmentPaymentsCount,
         "renewalCommitmentPaymentsCount" to renewalCommitmentPaymentsCount,
+    )
+}
+
+private fun OneTimePurchaseOfferDetails.mapOneTimePurchaseOfferDetails(): Map<String, Any?> {
+    return mapOf(
+        "price" to price.mapPrice(),
+        "offerId" to offerId,
+        "offerToken" to offerToken,
+        "offerTags" to offerTags,
+        "productId" to productId,
+        "presentedOfferingIdentifier" to presentedOfferingContext?.offeringIdentifier,
+        "presentedOfferingContext" to presentedOfferingContext?.map(),
     )
 }
