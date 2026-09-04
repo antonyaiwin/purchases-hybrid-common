@@ -3,6 +3,7 @@ package com.revenuecat.purchases.hybridcommon.mappers
 import androidx.annotation.VisibleForTesting
 import com.revenuecat.purchases.ProductType
 import com.revenuecat.purchases.amazon.AmazonStoreProduct
+import com.revenuecat.purchases.models.DiscountDisplayInfo
 import com.revenuecat.purchases.models.InstallmentsInfo
 import com.revenuecat.purchases.models.OneTimePurchaseOfferDetails
 import com.revenuecat.purchases.models.Period
@@ -275,5 +276,13 @@ private fun OneTimePurchaseOfferDetails.mapOneTimePurchaseOfferDetails(): Map<St
         "productId" to productId,
         "presentedOfferingIdentifier" to presentedOfferingContext?.offeringIdentifier,
         "presentedOfferingContext" to presentedOfferingContext?.map(),
+        "discountDisplayInfo" to discountDisplayInfo?.mapDiscountDisplayInfo(),
+    )
+}
+
+private fun DiscountDisplayInfo.mapDiscountDisplayInfo(): Map<String, Any?> {
+    return mapOf(
+        "percentageDiscount" to percentageDiscount,
+        "discountAmount" to discountAmount?.mapPrice(),
     )
 }
