@@ -10,6 +10,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            name = "GitHubPackagesPurchasesAndroid"
+            url = uri("https://maven.pkg.github.com/${System.getenv("GITHUB_REPOSITORY_OWNER") ?: "antonyaiwin"}/purchases-android")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR") ?: providers.gradleProperty("gpr.user").orNull ?: ""
+                password = System.getenv("GITHUB_TOKEN") ?: providers.gradleProperty("gpr.key").orNull ?: ""
+            }
+        }
     }
 }
 
