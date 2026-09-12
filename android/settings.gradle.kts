@@ -8,8 +8,6 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google()
-        mavenCentral()
         maven {
             name = "GitHubPackagesPurchasesAndroid"
             url = uri("https://maven.pkg.github.com/${System.getenv("GITHUB_REPOSITORY_OWNER") ?: "antonyaiwin"}/purchases-android")
@@ -18,6 +16,8 @@ dependencyResolutionManagement {
                 password = System.getenv("GITHUB_TOKEN") ?: providers.gradleProperty("gpr.key").orNull ?: ""
             }
         }
+        google()
+        mavenCentral()
     }
 }
 
